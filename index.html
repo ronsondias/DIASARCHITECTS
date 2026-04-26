@@ -78,7 +78,7 @@ nav{
   transition:background .4s,padding .3s;
 }
 nav.stuck{background:rgba(8,8,8,.96);backdrop-filter:blur(12px);padding:1rem 4rem;border-bottom:1px solid var(--line)}
-.n-logo{display:flex;align-items:flex-end;gap: 0.75em;rem}
+.n-logo{display:flex;align-items:flex-end;gap:0.75rem}
 .n-logo-mark{
   width:84px;height:84px;border-radius:2px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;
@@ -887,9 +887,41 @@ cntObs.observe(document.getElementById("hero"));
    PORTFOLIO
    ═══════════════════════════════════════════ */
 let projects=JSON.parse(localStorage.getItem("da_projects")||"[]");
-let pfFilter_="all", lbIdx=0, lbFiltered=[];
+
+// Migrate old format to new format (if needed)
+function migrateProjects(){
+  if(!projects.length) return;
+  
+  // Check if already in new format (has 'images' array)
+  if(projects[0].images) return;
+  
+  // Convert old format to new format
+  const migrated = [];
+  const grouped = {};
+  
+  projects.forEach(p => {
+    const key = `${p.name}_${p.cat}_${p.year}`;
+    if(!grouped[key]){
+      grouped[key] = {
+        id: p.id || Date.now()+Math.random(),
+        name: p.name,
+        cat: p.cat,
+        year: p.year,
+        images: []
+      };
+    }
+    if(p.img) grouped[key].images.push(p.img);
+  });
+  
+  projects = Object.values(grouped);
+  savePF();
+}
+
+migrateProjects();
 
 function savePF(){ localStorage.setItem("da_projects",JSON.stringify(projects)); }
+
+let pfFilter_="all", lbFiltered=[];
 
 function renderPF(){
   const g=document.getElementById("pfGrid");
@@ -901,7 +933,9 @@ function renderPF(){
   }
   lbFiltered.forEach((p,i)=>{
     const d=document.createElement("div"); d.className="pf-item";
-    d.innerHTML=`<img src="${p.img}" alt="${p.name}" loading="lazy"/>
+    // Show only the first image (main image) of each project
+    const mainImg = p.images ? p.images[0] : p.img;
+    d.innerHTML=`<img src="${mainImg}" alt="${p.name}" loading="lazy"/>
       <div class="pf-over"><div class="pf-cat">${p.cat}</div><div class="pf-name">${p.name}</div><div class="pf-yr">${p.year||""}</div></div>
       <button class="pf-zoom" onclick="lbOpen(${i})">View ↗</button>`;
     g.appendChild(d);
@@ -919,27 +953,72 @@ function pfFilter(cat,btn){
 /* ═══════════════════════════════════════════
    LIGHTBOX
    ═══════════════════════════════════════════ */
-function lbOpen(i){
-  lbIdx=i; const p=lbFiltered[i];
-  document.getElementById("lb-img").src=p.img;
-  document.getElementById("lb-title").textContent=p.name;
-  document.getElementById("lb-sub").textContent=`${p.cat} · ${p.year||""}`;
+let lbCurrentProjectIdx = 0; // Track current project in lightbox
+let lbCurrentImageIdx = 0;   // Track current image within project
+
+function lbOpen(projectIdx){
+  lbCurrentProjectIdx = projectIdx;
+  lbCurrentImageIdx = 0;
+  const project = lbFiltered[projectIdx];
+  const img = project.images ? project.images[0] : project.img;
+  
+  document.getElementById("lb-img").src = img;
+  document.getElementById("lb-title").textContent = project.name;
+  document.getElementById("lb-sub").textContent = `${project.cat} · ${project.year||""} · Image 1 of ${project.images ? project.images.length : 1}`;
   document.getElementById("lb").classList.add("open");
   document.body.style.overflow="hidden";
 }
+
 function lbClose(e){
   if(!e||e.target===document.getElementById("lb")||e.target.classList.contains("lb-x")){
     document.getElementById("lb").classList.remove("open");
     document.body.style.overflow="";
   }
 }
+
 function lbNav(dir){
-  lbIdx=(lbIdx+dir+lbFiltered.length)%lbFiltered.length;
-  const p=lbFiltered[lbIdx];
-  document.getElementById("lb-img").src=p.img;
-  document.getElementById("lb-title").textContent=p.name;
-  document.getElementById("lb-sub").textContent=`${p.cat} · ${p.year||""}`;
+  const project = lbFiltered[lbCurrentProjectIdx];
+  const totalImages = project.images ? project.images.length : 1;
+  
+  if(dir > 0){
+    // Next
+    if(lbCurrentImageIdx < totalImages - 1){
+      lbCurrentImageIdx++;
+    } else if(lbCurrentProjectIdx < lbFiltered.length - 1){
+      // Move to next project's first image
+      lbCurrentProjectIdx++;
+      lbCurrentImageIdx = 0;
+    } else {
+      // Wrap to first project
+      lbCurrentProjectIdx = 0;
+      lbCurrentImageIdx = 0;
+    }
+  } else {
+    // Previous
+    if(lbCurrentImageIdx > 0){
+      lbCurrentImageIdx--;
+    } else if(lbCurrentProjectIdx > 0){
+      // Move to previous project's last image
+      lbCurrentProjectIdx--;
+      const prevProject = lbFiltered[lbCurrentProjectIdx];
+      lbCurrentImageIdx = (prevProject.images ? prevProject.images.length : 1) - 1;
+    } else {
+      // Wrap to last project
+      lbCurrentProjectIdx = lbFiltered.length - 1;
+      const lastProject = lbFiltered[lbCurrentProjectIdx];
+      lbCurrentImageIdx = (lastProject.images ? lastProject.images.length : 1) - 1;
+    }
+  }
+  
+  const currentProject = lbFiltered[lbCurrentProjectIdx];
+  const currentImg = currentProject.images ? currentProject.images[lbCurrentImageIdx] : currentProject.img;
+  const totalImgs = currentProject.images ? currentProject.images.length : 1;
+  
+  document.getElementById("lb-img").src = currentImg;
+  document.getElementById("lb-title").textContent = currentProject.name;
+  document.getElementById("lb-sub").textContent = `${currentProject.cat} · ${currentProject.year||""} · Image ${lbCurrentImageIdx + 1} of ${totalImgs}`;
 }
+
 document.addEventListener("keydown",e=>{
   if(document.getElementById("lb").classList.contains("open")){
     if(e.key==="ArrowLeft")lbNav(-1);
@@ -1083,9 +1162,27 @@ function addProject(){
   const cat=document.getElementById("pj-cat").value;
   const year=document.getElementById("pj-yr").value.trim()||new Date().getFullYear().toString();
   if(!pendingImgs.length){ toast("Please select at least one image first.","err"); return; }
-  pendingImgs.forEach(img=>{
-    projects.push({id:Date.now()+Math.random(),name,cat,year,img});
-  });
+  
+  // Check if project already exists
+  let existingProject = projects.find(p => p.name === name && p.cat === cat);
+  
+  if(existingProject){
+    // Add images to existing project
+    pendingImgs.forEach(img=>{
+      existingProject.images.push(img);
+    });
+  } else {
+    // Create new project
+    const id = Date.now()+Math.random();
+    projects.push({
+      id: id,
+      name: name,
+      cat: cat,
+      year: year,
+      images: pendingImgs.slice()
+    });
+  }
+  
   savePF(); renderPF(); renderAdmGrid();
   pendingImgs=[];
   document.getElementById("pv-grid").innerHTML="";
@@ -1101,6 +1198,21 @@ function delProject(id){
   toast("Project removed.");
 }
 
+function delProjectImage(projectId, imageIdx){
+  const project = projects.find(p => p.id === projectId);
+  if(!project || !project.images) return;
+  
+  if(project.images.length === 1){
+    if(!confirm("This is the last image. Remove the entire project?")) return;
+    delProject(projectId);
+  } else {
+    if(!confirm("Remove this image from the project?")) return;
+    project.images.splice(imageIdx, 1);
+    savePF(); renderPF(); renderAdmGrid();
+    toast("Image removed from project.");
+  }
+}
+
 function renderAdmGrid(){
   const g=document.getElementById("adm-pf-grid");
   g.innerHTML="";
@@ -1108,12 +1220,18 @@ function renderAdmGrid(){
     g.innerHTML=`<div class="adm-empty" style="grid-column:1/-1">No projects yet. Upload your first design above.</div>`;
     return;
   }
+  
   projects.forEach(p=>{
-    const d=document.createElement("div"); d.className="pf-item";
-    d.innerHTML=`<img src="${p.img}" alt="${p.name}" loading="lazy"/>
-      <div class="pf-over"><div class="pf-cat">${p.cat}</div><div class="pf-name">${p.name}</div></div>
-      <button class="pf-zoom" style="transform:translate(-50%,-50%) scale(1);opacity:1;background:rgba(224,85,85,.9);border-color:#e05555;color:white" onclick="delProject(${p.id})">Delete ✕</button>`;
-    g.appendChild(d);
+    const images = p.images || (p.img ? [p.img] : []);
+    
+    images.forEach((img, imgIdx) => {
+      const d=document.createElement("div"); 
+      d.className="pf-item";
+      d.innerHTML=`<img src="${img}" alt="${p.name}" loading="lazy"/>
+        <div class="pf-over"><div class="pf-cat">${p.cat}</div><div class="pf-name">${p.name}${images.length > 1 ? ` (${imgIdx + 1}/${images.length})` : ''}</div></div>
+        <button class="pf-zoom" style="transform:translate(-50%,-50%) scale(1);opacity:1;background:rgba(224,85,85,.9);border-color:#e05555;color:white" onclick="delProjectImage(${p.id}, ${imgIdx})">Delete ✕</button>`;
+      g.appendChild(d);
+    });
   });
 }
 
