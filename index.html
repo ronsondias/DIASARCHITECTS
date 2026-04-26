@@ -807,7 +807,7 @@ footer{
   <div class="ft-copy">© 2026 Dias Architects. All rights reserved. | www.diasarchitects.in</div>
   <!-- SECRET TRIGGER: invisible text in footer — only accessible if you know it's there -->
   <!-- Access admin by typing: Ctrl+Shift+A  OR  click the invisible element below -->
-  <button id="sec-trig" onclick="revealAdmin()" title="">·</button>
+  <button id="sec-trig" onclick="revealAdmin()" title="" aria-label="admin">·</button>
 </footer>
 
 <!-- WHATSAPP FLOAT -->
@@ -906,7 +906,7 @@ cntObs.observe(document.getElementById("hero"));
    4. Paste GIST_ID below, redeploy
 */
 
-const GITHUB_TOKEN = "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";
+const GITHUB_TOKEN = "PASTE_YOUR_GITHUB_TOKEN_HERE";
 const GIST_ID      = "PASTE_GIST_ID_AFTER_FIRST_SAVE"; // auto-created on first save
 const GIST_FILE    = "dias_portfolio.json";
 const GIST_API     = "https://api.github.com/gists";
@@ -926,7 +926,7 @@ function _headers(){
 
 /* ─── LOAD on every page visit ─── */
 async function loadCloudProjects(){
-  if(!_gistId || GITHUB_TOKEN === "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"){
+  if(!_gistId || GITHUB_TOKEN === "PASTE_YOUR_GITHUB_TOKEN_HERE"){
     // Not configured yet — use localStorage cache
     try{ projects = JSON.parse(localStorage.getItem("da_projects")||"[]"); }catch(e){}
     renderPF(); return;
@@ -960,7 +960,7 @@ async function savePF(){
   // Always cache locally
   try{ localStorage.setItem("da_projects", JSON.stringify(projects)); }catch(e){}
 
-  if(GITHUB_TOKEN === "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"){
+  if(GITHUB_TOKEN === "PASTE_YOUR_GITHUB_TOKEN_HERE"){
     toast("⚠️ Add your GitHub token to enable cloud sync","err");
     renderPF(); renderAdmGrid(); return;
   }
@@ -1142,7 +1142,28 @@ function sendForm(e){
 
 // ── Secret access: Ctrl+Shift+A keyboard combo ──
 document.addEventListener("keydown",e=>{
-  if(e.ctrlKey && e.shiftKey && e.key==="A"){ e.preventDefault(); revealAdmin(); }
+  // Ctrl+Shift+A (works cross-browser/OS)
+  if(e.ctrlKey && e.shiftKey && (e.key==="A"||e.key==="a")){
+    e.preventDefault(); revealAdmin(); return;
+  }
+  // Also support: just typing "admin" anywhere on page (mobile-friendly secret)
+});
+
+/* ── Secret: type "admin" anywhere to open panel ── */
+let _adminTyped = "";
+document.addEventListener("keypress", e=>{
+  _adminTyped += e.key.toLowerCase();
+  if(_adminTyped.length > 5) _adminTyped = _adminTyped.slice(-5);
+  if(_adminTyped === "admin"){ revealAdmin(); _adminTyped = ""; }
+});
+
+/* ── Mobile: triple-tap the footer brand ── */
+let _tapCount = 0, _tapTimer;
+document.querySelector(".ft-brand")?.addEventListener("click", ()=>{
+  _tapCount++;
+  clearTimeout(_tapTimer);
+  _tapTimer = setTimeout(()=>{ _tapCount=0; }, 600);
+  if(_tapCount >= 3){ revealAdmin(); _tapCount=0; }
 });
 
 function revealAdmin(){
