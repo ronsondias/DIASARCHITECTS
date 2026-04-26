@@ -11,6 +11,8 @@
 <title>Dias Architects — Architecture & Civil Engineering</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;0,700;1,300;1,400&family=DM+Sans:wght@200;300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
 <style>
 /*─────────────────────────────────────────
   DESIGN TOKENS
@@ -820,17 +822,18 @@ footer{
 <script>
 "use strict";
 /* ═══════════════════════════════════════════
-   SECURITY CONFIG  ← change these!
+   FIREBASE CONFIG  ← change these!
    ═══════════════════════════════════════════ */
-const ADMIN_USER = "diasadmin";
-// SHA-256 hash of "Dias@Ace2024!" — change pass & regenerate hash
-// Password is:  Dias@Ace2024!
-const ADMIN_HASH = "6d5b3e7c2a9f1d8e4c0b7a2f6e3d9c1b5a8f4e2d7c0b6a3f9e5d2c8b1a7f4e3"; 
-// (stored as hash — never in plaintext)
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS   = 5 * 60 * 1000; // 5 minutes
-const SESSION_KEY  = "da_sess";
-const RATE_KEY     = "da_rate";
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef123456"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
 /* ── Simple SHA-256 polyfill (pure JS, no lib) ── */
 async function sha256(str){
@@ -887,46 +890,36 @@ const cntObs=new IntersectionObserver(e=>{ if(e[0].isIntersecting){ countUp(docu
 cntObs.observe(document.getElementById("hero"));
 
 /* ═══════════════════════════════════════════
-   PORTFOLIO — GITHUB GIST CLOUD STORAGE
+   PORTFOLIO — FIREBASE CLOUD STORAGE
    ═══════════════════════════════════════════
 
    HOW IT WORKS:
-   - Projects saved to a GitHub Gist as JSON
-   - Every device loads from the same Gist URL
-   - Images compressed & stored as base64 in Gist
-   - Admin sets GITHUB_TOKEN + GIST_ID below
+   - Projects saved to Firebase Firestore as a document
+   - Every device loads from the same Firestore collection
+   - Images compressed & stored as base64 in Firestore
+   - Admin sets Firebase config above
 
-   SETUP (2 min):
-   1. Go to github.com → Settings → Developer settings
-      → Personal access tokens → Tokens (classic)
-      → Generate new token → check "gist" scope → Copy token
-   2. Paste token into GITHUB_TOKEN below
-   3. Deploy site, open admin, save first project
-      → Gist is auto-created, GIST_ID shown on screen
-   4. Paste GIST_ID below, redeploy
+   SETUP (5 min):
+   1. Go to https://console.firebase.google.com → Create project
+   2. Enable Firestore in the project
+   3. Set Firestore rules to allow public read/write:
+      rules_version = '2';
+      service cloud.firestore {
+        match /databases/{database}/documents {
+          match /{document=**} {
+            allow read, write: if true;
+          }
+        }
+      }
+   4. Copy your project config from Firebase console → Project settings → General → Your apps → Web app
+   5. Paste the config into firebaseConfig above
 */
 
-const GITHUB_TOKEN = "PASTE_YOUR_GITHUB_TOKEN_HERE";
-const GIST_ID      = "PASTE_GIST_ID_AFTER_FIRST_SAVE"; // auto-created on first save
-const GIST_FILE    = "dias_portfolio.json";
-const GIST_API     = "https://api.github.com/gists";
-
 let projects = [];
-let _gistId  = (GIST_ID !== "PASTE_GIST_ID_AFTER_FIRST_SAVE") ? GIST_ID
-               : localStorage.getItem("da_gist_id") || null;
-
-/* ─── helpers ─── */
-function _headers(){
-  return {
-    "Content-Type" : "application/json",
-    "Accept"       : "application/vnd.github+json",
-    "Authorization": `Bearer ${GITHUB_TOKEN}`
-  };
-}
 
 /* ─── LOAD on every page visit ─── */
 async function loadCloudProjects(){
-  if(!_gistId || GITHUB_TOKEN === "PASTE_YOUR_GITHUB_TOKEN_HERE"){
+  if(firebaseConfig.apiKey === "PASTE_YOUR_API_KEY"){
     // Not configured yet — use localStorage cache
     try{ projects = JSON.parse(localStorage.getItem("da_projects")||"[]"); }catch(e){}
     renderPF(); return;
@@ -936,15 +929,9 @@ async function loadCloudProjects(){
     `<div class="pf-empty"><div class="pf-empty-icon" style="display:inline-block;animation:spin 1s linear infinite">◌</div><div class="pf-empty-text">Loading portfolio…</div></div>`;
 
   try{
-    const r = await fetch(`${GIST_API}/${_gistId}`, {
-      headers:{ "Accept":"application/vnd.github+json" }
-      // Public gist — no auth needed for reading
-    });
-    if(!r.ok) throw new Error("Gist fetch failed: " + r.status);
-    const data = await r.json();
-    const raw  = data.files[GIST_FILE]?.content;
-    if(raw){
-      projects = JSON.parse(raw);
+    const doc = await db.collection('portfolio').doc('data').get();
+    if(doc.exists){
+      projects = doc.data().projects || [];
       // cache locally for offline
       try{ localStorage.setItem("da_projects", JSON.stringify(projects)); }catch(e){}
     }
@@ -960,64 +947,17 @@ async function savePF(){
   // Always cache locally
   try{ localStorage.setItem("da_projects", JSON.stringify(projects)); }catch(e){}
 
-  if(GITHUB_TOKEN === "PASTE_YOUR_GITHUB_TOKEN_HERE"){
-    toast("⚠️ Add your GitHub token to enable cloud sync","err");
+  if(firebaseConfig.apiKey === "PASTE_YOUR_API_KEY"){
+    toast("⚠️ Add your Firebase config to enable cloud sync","err");
     renderPF(); renderAdmGrid(); return;
   }
 
-  const payload = JSON.stringify({ projects });
-
   try{
-    if(!_gistId){
-      /* First save — create a new gist */
-      const r = await fetch(GIST_API, {
-        method : "POST",
-        headers: _headers(),
-        body   : JSON.stringify({
-          description: "Dias Architects Portfolio Data",
-          public: true,
-          files: { [GIST_FILE]: { content: payload } }
-        })
-      });
-      if(!r.ok) throw new Error("Gist create failed: " + r.status);
-      const data = await r.json();
-      _gistId = data.id;
-      localStorage.setItem("da_gist_id", _gistId);
-
-      /* Show the Gist ID prominently so admin can hardcode it */
-      const notice = document.createElement("div");
-      notice.id = "gist-notice";
-      notice.style.cssText = "position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#111;border:1px solid var(--gold);color:var(--gold);padding:1.5rem 2rem;z-index:9500;font-family:var(--sans);text-align:center;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.8)";
-      notice.innerHTML = `
-        <div style="font-size:.6rem;letter-spacing:.25em;text-transform:uppercase;margin-bottom:.8rem">✅ Gist Created — Paste this into your HTML</div>
-        <code id="gist-id-code" style="font-size:1rem;color:#fff;background:#000;padding:.4rem .9rem;display:inline-block;margin-bottom:1rem">${_gistId}</code><br/>
-        <div style="font-size:.72rem;color:var(--fog);margin-bottom:1rem">
-          In your <strong>index.html</strong>, find:<br/>
-          <code style="color:var(--gold)">const GIST_ID = "PASTE_GIST_ID_AFTER_FIRST_SAVE"</code><br/>
-          Replace with:<br/>
-          <code style="color:#fff">const GIST_ID = "${_gistId}"</code>
-        </div>
-        <button onclick="navigator.clipboard.writeText('${_gistId}').then(()=>this.textContent='Copied ✓')" style="background:var(--gold);color:#000;border:none;padding:.5rem 1.4rem;cursor:pointer;font-size:.75rem;letter-spacing:.1em;margin-right:.5rem">Copy ID</button>
-        <button onclick="document.getElementById('gist-notice').remove()" style="background:none;color:var(--fog);border:1px solid #333;padding:.5rem 1.2rem;cursor:pointer;font-size:.75rem">Dismiss</button>
-      `;
-      document.body.appendChild(notice);
-      toast("✅ Portfolio synced to cloud! See instructions above.");
-
-    } else {
-      /* Update existing gist */
-      const r = await fetch(`${GIST_API}/${_gistId}`, {
-        method : "PATCH",
-        headers: _headers(),
-        body   : JSON.stringify({
-          files: { [GIST_FILE]: { content: payload } }
-        })
-      });
-      if(!r.ok) throw new Error("Gist update failed: " + r.status);
-      toast("☁️ Portfolio saved — visible on all devices!");
-    }
+    await db.collection('portfolio').doc('data').set({ projects });
+    toast("☁️ Portfolio saved — visible on all devices!");
   } catch(e){
     console.error("Cloud save error:", e);
-    toast("Saved locally only — check your GitHub token","err");
+    toast("Saved locally only — check your Firebase config","err");
   }
 }
 
