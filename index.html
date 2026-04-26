@@ -78,13 +78,13 @@ nav{
   transition:background .4s,padding .3s;
 }
 nav.stuck{background:rgba(8,8,8,.96);backdrop-filter:blur(12px);padding:1rem 4rem;border-bottom:1px solid var(--line)}
-.n-logo{display:flex;align-items:center;gap:.75rem}
+.n-logo{display:flex;align-items:flex-end;gap: 0.75em;rem}
 .n-logo-mark{
-  width:36px;height:36px;background:var(--gold);border-radius:2px;
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--serif);font-size:1.1rem;color:var(--ink);font-weight:700;
+  width:84px;height:84px;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
 }
-.n-logo-text{font-family:var(--serif);font-size:1rem;letter-spacing:.18em;color:var(--gold);font-weight:300}
+.n-logo-mark img{width:100%;height:100%;object-fit:contain;display:block}
+.n-logo-text{font-family:var(--serif);font-size:1rem;line-height:1;color:var(--gold);letter-spacing:.18em;font-weight:300;display:inline-flex;align-items:flex-end;margin-bottom:.15rem}
 .n-links{display:flex;gap:2.5rem;list-style:none}
 .n-links a{font-size:.65rem;letter-spacing:.22em;text-transform:uppercase;color:var(--fog);transition:color .25s;position:relative}
 .n-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:var(--gold);transition:width .3s}
@@ -532,8 +532,10 @@ footer{
 <!-- NAV -->
 <nav id="nav">
   <a href="#" class="n-logo">
-    <div class="n-logo-mark">D</div>
-    <div class="n-logo-text">DIAS ARCHITECTS</div>
+    <div class="n-logo-mark">
+      <img src="logo final golden - .png" alt="Dias Architects golden logo" />
+    </div>
+    <div class="n-logo-text">Architects & Civil Engineers</div>
   </a>
   <ul class="n-links" id="navLinks">
     <li><a href="#about" onclick="closeMenu()">About</a></li>
@@ -610,7 +612,8 @@ footer{
         <div class="t-name">Ronson Dias</div>
         <div class="t-det">
           Architecture Design &amp; Planning<br/>
-          <a href="https://www.instagram.com/dias.ace" target="_blank">@dias.ace on Instagram ↗</a>
+          <a href="tel:+919945228498">+91 99452 28498</a><br/>
+          <a href="mailto:ronsondias03@gmail.com">ronsondias03@gmail.com</a>
         </div>
         <span class="t-badge">B.Arch</span>
       </div>
@@ -619,7 +622,8 @@ footer{
         <div class="t-name">Rohan Dias</div>
         <div class="t-det">
           Structural &amp; Civil Engineering<br/>
-          <a href="tel:+919945228498">+91 99452 28498</a>
+          <a href="tel:+919113007715">+91 91130 07715</a><br/>
+          <a href="mailto:rohandias24@gmail.com">rohandias24@gmail.com</a>
         </div>
         <span class="t-badge">Civil Engineer</span>
       </div>
@@ -638,9 +642,7 @@ footer{
   <div class="pf-filters rv delay1" id="pfFilters">
     <button class="pf-btn on" onclick="pfFilter('all',this)">All</button>
     <button class="pf-btn" onclick="pfFilter('residential',this)">Residential</button>
-    <button class="pf-btn" onclick="pfFilter('commercial',this)">Commercial</button>
     <button class="pf-btn" onclick="pfFilter('interior',this)">Interior</button>
-    <button class="pf-btn" onclick="pfFilter('landscape',this)">Landscape</button>
   </div>
   <div class="pf-grid" id="pfGrid"></div>
 </section>
