@@ -1148,6 +1148,7 @@ document.addEventListener("keydown",e=>{
 function revealAdmin(){
   const sec=document.getElementById("admin");
   sec.classList.add("vis");
+  initDZ(); // attach drop zone listeners now that panel is visible
   // Check if already logged in this session
   const sess=sessionStorage.getItem(SESSION_KEY);
   if(sess==="authenticated"){ showDashboard(); }
@@ -1236,10 +1237,17 @@ function doLogout(){
    ═══════════════════════════════════════════ */
 let pendingImgs=[];
 
-const dz=document.getElementById("dz");
-dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
-dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
-dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("over");dzFiles(e.dataTransfer.files)});
+/* dz listeners attached lazily when admin panel first opens */
+let _dzReady = false;
+function initDZ(){
+  if(_dzReady) return;
+  const dz=document.getElementById("dz");
+  if(!dz) return;
+  dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
+  dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
+  dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("over");dzFiles(e.dataTransfer.files)});
+  _dzReady = true;
+}
 
 
 /* ── Image compression — keeps images under 800px wide for storage ── */
