@@ -887,123 +887,137 @@ const cntObs=new IntersectionObserver(e=>{ if(e[0].isIntersecting){ countUp(docu
 cntObs.observe(document.getElementById("hero"));
 
 /* ═══════════════════════════════════════════
-   PORTFOLIO — CLOUD STORAGE (cross-device)
-   ═══════════════════════════════════════════ */
+   PORTFOLIO — GITHUB GIST CLOUD STORAGE
+   ═══════════════════════════════════════════
 
-/* ── Cloud config ──
-   Uses JSONBin.io as a free shared cross-device database.
    HOW IT WORKS:
-   1. Admin uploads images → saved to JSONBin cloud
-   2. The Bin ID is stored in a known fixed "registry" bin
-   3. Every visitor reads from that same bin → images show everywhere
-   
-   SETUP: Replace JSONBIN_MASTER_KEY below with your free JSONBin API key.
-   Get one free at: https://jsonbin.io (Sign up → API Keys)
-   
-   Default key below is a demo key — replace with yours for production.
+   - Projects saved to a GitHub Gist as JSON
+   - Every device loads from the same Gist URL
+   - Images compressed & stored as base64 in Gist
+   - Admin sets GITHUB_TOKEN + GIST_ID below
+
+   SETUP (2 min):
+   1. Go to github.com → Settings → Developer settings
+      → Personal access tokens → Tokens (classic)
+      → Generate new token → check "gist" scope → Copy token
+   2. Paste token into GITHUB_TOKEN below
+   3. Deploy site, open admin, save first project
+      → Gist is auto-created, GIST_ID shown on screen
+   4. Paste GIST_ID below, redeploy
 */
-const CLOUD_KEY = "da_bin_id";
+
+const GITHUB_TOKEN = "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";
+const GIST_ID      = "PASTE_GIST_ID_AFTER_FIRST_SAVE"; // auto-created on first save
+const GIST_FILE    = "dias_portfolio.json";
+const GIST_API     = "https://api.github.com/gists";
+
 let projects = [];
-let _binId = localStorage.getItem(CLOUD_KEY) || null;
+let _gistId  = (GIST_ID !== "PASTE_GIST_ID_AFTER_FIRST_SAVE") ? GIST_ID
+               : localStorage.getItem("da_gist_id") || null;
 
-const JSONBIN_API = "https://api.jsonbin.io/v3";
-// ⚠️ REPLACE THIS with your own free key from jsonbin.io
-const JSONBIN_MASTER_KEY = "$2a$10$XUmYP9qAytTGcLnaJvFOAO6A2uL2pjw1mCTgKqsN1bZYk7G52B.Rm";
-// The shared bin ID — set this after first admin save (or hardcode it here)
-// Leave as null to auto-create on first admin save
-const FIXED_BIN_ID = null; // e.g. "64abc123def456" — paste from JSONBin after first save
+/* ─── helpers ─── */
+function _headers(){
+  return {
+    "Content-Type" : "application/json",
+    "Accept"       : "application/vnd.github+json",
+    "Authorization": `Bearer ${GITHUB_TOKEN}`
+  };
+}
 
-/* ── Load projects from cloud on page load ── */
+/* ─── LOAD on every page visit ─── */
 async function loadCloudProjects(){
-  // Use FIXED_BIN_ID if set (recommended for production), otherwise use stored ID
-  const activeBinId = FIXED_BIN_ID || _binId;
-  
-  if(!activeBinId || JSONBIN_MASTER_KEY === "$2a$10$XUmYP9qAytTGcLnaJvFOAO6A2uL2pjw1mCTgKqsN1bZYk7G52B.Rm"){
-    // No cloud configured yet — use localStorage fallback
-    const local = localStorage.getItem("da_projects");
-    if(local){ try{ projects = JSON.parse(local); }catch(e){} }
-    renderPF();
-    return;
+  if(!_gistId || GITHUB_TOKEN === "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"){
+    // Not configured yet — use localStorage cache
+    try{ projects = JSON.parse(localStorage.getItem("da_projects")||"[]"); }catch(e){}
+    renderPF(); return;
   }
-  
-  const pfGrid = document.getElementById("pfGrid");
-  pfGrid.innerHTML = `<div class="pf-empty"><div class="pf-empty-icon" style="animation:spin 1s linear infinite;display:inline-block">◌</div><div class="pf-empty-text">Loading portfolio…</div></div>`;
-  
+
+  document.getElementById("pfGrid").innerHTML =
+    `<div class="pf-empty"><div class="pf-empty-icon" style="display:inline-block;animation:spin 1s linear infinite">◌</div><div class="pf-empty-text">Loading portfolio…</div></div>`;
+
   try{
-    const r = await fetch(`${JSONBIN_API}/b/${activeBinId}/latest`, {
-      headers:{ "X-Access-Key": JSONBIN_MASTER_KEY }
+    const r = await fetch(`${GIST_API}/${_gistId}`, {
+      headers:{ "Accept":"application/vnd.github+json" }
+      // Public gist — no auth needed for reading
     });
-    if(r.ok){
-      const data = await r.json();
-      projects = data.record.projects || [];
-      // Cache locally for offline fallback
+    if(!r.ok) throw new Error("Gist fetch failed: " + r.status);
+    const data = await r.json();
+    const raw  = data.files[GIST_FILE]?.content;
+    if(raw){
+      projects = JSON.parse(raw);
+      // cache locally for offline
       try{ localStorage.setItem("da_projects", JSON.stringify(projects)); }catch(e){}
-    } else {
-      throw new Error("Fetch failed: " + r.status);
     }
   } catch(e){
-    // Fallback to localStorage cache
-    const local = localStorage.getItem("da_projects");
-    if(local){ try{ projects = JSON.parse(local); }catch(ex){} }
-    console.warn("Cloud load failed, using local cache:", e.message);
+    console.warn("Cloud load failed:", e.message);
+    try{ projects = JSON.parse(localStorage.getItem("da_projects")||"[]"); }catch(ex){}
   }
   renderPF();
 }
 
+/* ─── SAVE (admin only) ─── */
 async function savePF(){
-  // Always cache locally as fallback
+  // Always cache locally
   try{ localStorage.setItem("da_projects", JSON.stringify(projects)); }catch(e){}
 
-  if(JSONBIN_MASTER_KEY === "$2a$10$XUmYP9qAytTGcLnaJvFOAO6A2uL2pjw1mCTgKqsN1bZYk7G52B.Rm"){
-    toast("⚠️ Add your JSONBin key to enable cloud sync","err");
-    renderPF(); renderAdmGrid();
-    return;
+  if(GITHUB_TOKEN === "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"){
+    toast("⚠️ Add your GitHub token to enable cloud sync","err");
+    renderPF(); renderAdmGrid(); return;
   }
 
-  const activeBinId = FIXED_BIN_ID || _binId;
-  
+  const payload = JSON.stringify({ projects });
+
   try{
-    if(!activeBinId){
-      // First time — create a new public bin
-      const r = await fetch(`${JSONBIN_API}/b`, {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "X-Master-Key": JSONBIN_MASTER_KEY,
-          "X-Bin-Name": "dias-architects-portfolio",
-          "X-Bin-Private": "false"
-        },
-        body: JSON.stringify({ projects })
+    if(!_gistId){
+      /* First save — create a new gist */
+      const r = await fetch(GIST_API, {
+        method : "POST",
+        headers: _headers(),
+        body   : JSON.stringify({
+          description: "Dias Architects Portfolio Data",
+          public: true,
+          files: { [GIST_FILE]: { content: payload } }
+        })
       });
-      if(r.ok){
-        const data = await r.json();
-        _binId = data.metadata.id;
-        localStorage.setItem(CLOUD_KEY, _binId);
-        toast(`✅ Cloud bin created! Copy this ID into FIXED_BIN_ID: ${_binId}`);
-        // Show the bin ID prominently for the admin to copy into the code
-        const notice = document.createElement("div");
-        notice.style.cssText="position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#1a1a1a;border:1px solid var(--gold);color:var(--gold);padding:1.2rem 2rem;z-index:9000;font-family:monospace;font-size:.85rem;text-align:center;max-width:90vw";
-        notice.innerHTML=`<strong>📋 Your Bin ID (paste into FIXED_BIN_ID in the HTML):</strong><br/><br/><code style="font-size:1.1rem;color:white">${_binId}</code><br/><br/><button onclick="navigator.clipboard.writeText('${_binId}');this.textContent='Copied!'" style="margin-top:.5rem;background:var(--gold);color:#000;border:none;padding:.4rem 1rem;cursor:pointer">Copy ID</button> <button onclick="this.parentElement.remove()" style="margin-top:.5rem;background:none;color:var(--fog);border:1px solid var(--fog);padding:.4rem 1rem;cursor:pointer">Close</button>`;
-        document.body.appendChild(notice);
-      } else {
-        throw new Error("Bin creation failed: " + r.status);
-      }
+      if(!r.ok) throw new Error("Gist create failed: " + r.status);
+      const data = await r.json();
+      _gistId = data.id;
+      localStorage.setItem("da_gist_id", _gistId);
+
+      /* Show the Gist ID prominently so admin can hardcode it */
+      const notice = document.createElement("div");
+      notice.id = "gist-notice";
+      notice.style.cssText = "position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#111;border:1px solid var(--gold);color:var(--gold);padding:1.5rem 2rem;z-index:9500;font-family:var(--sans);text-align:center;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.8)";
+      notice.innerHTML = `
+        <div style="font-size:.6rem;letter-spacing:.25em;text-transform:uppercase;margin-bottom:.8rem">✅ Gist Created — Paste this into your HTML</div>
+        <code id="gist-id-code" style="font-size:1rem;color:#fff;background:#000;padding:.4rem .9rem;display:inline-block;margin-bottom:1rem">${_gistId}</code><br/>
+        <div style="font-size:.72rem;color:var(--fog);margin-bottom:1rem">
+          In your <strong>index.html</strong>, find:<br/>
+          <code style="color:var(--gold)">const GIST_ID = "PASTE_GIST_ID_AFTER_FIRST_SAVE"</code><br/>
+          Replace with:<br/>
+          <code style="color:#fff">const GIST_ID = "${_gistId}"</code>
+        </div>
+        <button onclick="navigator.clipboard.writeText('${_gistId}').then(()=>this.textContent='Copied ✓')" style="background:var(--gold);color:#000;border:none;padding:.5rem 1.4rem;cursor:pointer;font-size:.75rem;letter-spacing:.1em;margin-right:.5rem">Copy ID</button>
+        <button onclick="document.getElementById('gist-notice').remove()" style="background:none;color:var(--fog);border:1px solid #333;padding:.5rem 1.2rem;cursor:pointer;font-size:.75rem">Dismiss</button>
+      `;
+      document.body.appendChild(notice);
+      toast("✅ Portfolio synced to cloud! See instructions above.");
+
     } else {
-      // Update existing bin
-      const r = await fetch(`${JSONBIN_API}/b/${activeBinId}`, {
-        method:"PUT",
-        headers:{
-          "Content-Type":"application/json",
-          "X-Master-Key": JSONBIN_MASTER_KEY
-        },
-        body: JSON.stringify({ projects })
+      /* Update existing gist */
+      const r = await fetch(`${GIST_API}/${_gistId}`, {
+        method : "PATCH",
+        headers: _headers(),
+        body   : JSON.stringify({
+          files: { [GIST_FILE]: { content: payload } }
+        })
       });
-      if(!r.ok) throw new Error("Update failed: " + r.status);
-      toast("Portfolio saved to cloud ☁️ — visible on all devices!");
+      if(!r.ok) throw new Error("Gist update failed: " + r.status);
+      toast("☁️ Portfolio saved — visible on all devices!");
     }
   } catch(e){
     console.error("Cloud save error:", e);
-    toast("Saved locally only — check your JSONBin key","err");
+    toast("Saved locally only — check your GitHub token","err");
   }
 }
 
