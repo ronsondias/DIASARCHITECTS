@@ -1129,7 +1129,7 @@ async function addProject(){
   const cat=document.getElementById("pj-cat").value;
   const year=parseInt(document.getElementById("pj-yr").value.trim())||new Date().getFullYear();
   const fileInput=document.getElementById("dz-in");
-  const files=[...pendingFiles,...Array.from(fileInput.files)];
+  const files=pendingFiles;
   if(!files.length){ toast("Please select at least one image first.","err"); return; }
 
   const btn=document.querySelector(".add-form .f-submit");
