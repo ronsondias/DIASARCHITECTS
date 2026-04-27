@@ -848,6 +848,7 @@ footer{
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script>
 "use strict";
 
@@ -858,6 +859,14 @@ const DB_TABLE        = "projects";
 const DB_IMAGES_TABLE = "project_images";
 const ENQUIRIES_TABLE = "enquiries";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Initialize EmailJS
+// To set up email sending:
+// 1. Go to https://www.emailjs.com/ and create a free account
+// 2. Create an email service (Gmail or other provider)
+// 3. Create an email template with variables: {{from_name}}, {{from_email}}, {{phone}}, {{project_type}}, {{message}}, {{to_email}}
+// 4. Replace the service ID, template ID, and public key below
+emailjs.init('RzHS9M9l0j1sDKPl8'); // Replace with your EmailJS public key
 
 window.addEventListener("load",()=>{
   setTimeout(()=>{ document.getElementById("loader").classList.add("done"); initReveal(); },1500);
@@ -1024,11 +1033,44 @@ async function sendForm(e){
     message: e.target.querySelector("textarea")?.value?.trim()||null,
   };
   if(!row.full_name||!row.phone){ toast("Please fill in name and phone.","err"); btn.disabled=false; return; }
+
   try {
+    // Send email using EmailJS
+    await emailjs.send(
+      'service_rk2zlan', // Replace with your EmailJS service ID
+      'template_raisanw', // Replace with your EmailJS template ID
+      {
+        from_name: row.full_name,
+        from_email: row.email || 'Not provided',
+        phone: row.phone,
+        project_type: row.project_type || 'Not specified',
+        message: row.message || 'No message provided',
+        to_email: 'diasarchitects.in@gmail.com'
+      }
+      // Remove the public key parameter - it's already initialized above
+    );
+
+    // Also save to database as backup
     const {error}=await sb.from(ENQUIRIES_TABLE).insert([row]);
-    if(error) throw error;
-    toast("Enquiry sent! We'll contact you shortly."); e.target.reset();
-  } catch(err){ toast("Could not send. Please call us directly.","err"); }
+    if(error) console.warn('Database save failed:', error);
+
+    toast("Enquiry sent! We'll contact you shortly.");
+    e.target.reset();
+  } catch(err){
+    console.error('Email send failed:', err);
+    // Fallback: try to save to database only
+    try {
+      const {error}=await sb.from(ENQUIRIES_TABLE).insert([row]);
+      if(!error) {
+        toast("Enquiry saved! We'll contact you shortly.");
+        e.target.reset();
+      } else {
+        throw error;
+      }
+    } catch(dbErr) {
+      toast("Could not send. Please email us directly at diasarchitects.in@gmail.com","err");
+    }
+  }
   btn.disabled=false;
 }
 
