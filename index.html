@@ -738,6 +738,7 @@ footer{
 <section id="admin">
   <!-- Security Gate -->
   <div id="ag">
+    <div id="ag-login-view">
     <div class="sec-label">Restricted Access</div>
     <div class="ag-head">Portfolio Manager</div>
     <div class="ag-sub">Enter your credentials to manage the portfolio gallery.</div>
@@ -752,7 +753,29 @@ footer{
     <div class="ag-err" id="ag-err"></div>
     <div class="ag-lock" id="ag-lock"></div>
     <button class="ag-btn" id="ag-btn" onclick="doLogin()">Login</button>
+      <div style="text-align:center;margin-top:1rem">
+        <button onclick="showForgot()" style="background:none;border:none;color:var(--fog);font-size:.7rem;letter-spacing:.1em;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Forgot password?</button>
+      </div>
     <div class="ag-hint">This page is not publicly linked.</div>
+    </div><!-- end login view -->
+
+    <!-- FORGOT PASSWORD VIEW -->
+    <div id="ag-forgot-view" style="display:none">
+      <div class="sec-label">Password Reset</div>
+      <div class="ag-head">Reset Password</div>
+      <div class="ag-sub">Enter your admin email and we'll send a reset link to your inbox.</div>
+      <div class="ag-field">
+        <label class="fl">Email</label>
+        <input class="ag-inp" type="email" id="ag-reset-email" placeholder="admin@yourdomain.com" autocomplete="off" onkeydown="if(event.key==='Enter')doForgot()"/>
+      </div>
+      <div class="ag-err" id="ag-forgot-err"></div>
+      <div id="ag-forgot-ok" style="display:none;font-size:.72rem;color:#4ade80;margin-top:.5rem;letter-spacing:.05em;text-align:center;line-height:1.6"></div>
+      <button class="ag-btn" id="ag-forgot-btn" onclick="doForgot()" style="margin-top:1.2rem">Send Reset Link</button>
+      <div style="text-align:center;margin-top:1rem">
+        <button onclick="showLogin()" style="background:none;border:none;color:var(--fog);font-size:.7rem;letter-spacing:.1em;cursor:pointer;text-decoration:underline;text-underline-offset:3px">&larr; Back to login</button>
+      </div>
+    </div>
+
   </div>
 
   <!-- Dashboard (shown after login) -->
@@ -791,6 +814,13 @@ footer{
       <div class="fg"><label class="fl">Year</label><input class="fi" id="pj-yr" placeholder="2024"/></div>
       <button class="f-submit" onclick="addProject()" style="padding:.85rem 1.5rem"><span>Add ✓</span></button>
     </div>
+    <div id="up-status" style="display:none;margin-bottom:1.5rem;padding:1.2rem 1.5rem;border:1px solid var(--line);background:var(--ink3)">
+      <div style="font-size:.7rem;letter-spacing:.15em;color:var(--gold);margin-bottom:.7rem" id="up-status-title">Uploading…</div>
+      <div style="background:rgba(198,168,75,.1);height:4px;border-radius:2px;overflow:hidden">
+        <div id="up-bar" style="height:100%;background:var(--gold);width:0%;transition:width .4s ease"></div>
+      </div>
+      <div id="up-status-detail" style="font-size:.68rem;color:var(--fog);margin-top:.6rem">Preparing…</div>
+    </div>
 
     <!-- Manage existing -->
     <div class="adm-sec-title">Existing Portfolio</div>
@@ -818,29 +848,18 @@ footer{
 <script>
 "use strict";
 
-/* ═══════════════════════════════════════════════════════════
-   SUPABASE CONFIG  ← Fill these in after creating your project
-   ═══════════════════════════════════════════════════════════
-   Step-by-step setup is in SETUP.md (included in this folder)
-   ═══════════════════════════════════════════════════════════ */
-const SUPABASE_URL  = "https://dpqszcoqpimvihqhwjhu.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwcXN6Y29xcGltdmlocWh3amh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNDYxODEsImV4cCI6MjA5MjgyMjE4MX0.ubEmfiGE-ZmgNV8KEu2uoqUfLHZMTQJttCw2WoApbvo";
-const STORAGE_BUCKET = "portfolio-images";
-const DB_TABLE       = "projects";
+const SUPABASE_URL   = "https://dpqszcoqpimvihqhwjhu.supabase.co";
+const SUPABASE_ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwcXN6Y29xcGltdmlocWh3amh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNDYxODEsImV4cCI6MjA5MjgyMjE4MX0.ubEmfiGE-ZmgNV8KEu2uoqUfLHZMTQJttCw2WoApbvo";
+const STORAGE_BUCKET  = "portfolio-images";
+const DB_TABLE        = "projects";
+const DB_IMAGES_TABLE = "project_images";
 const ENQUIRIES_TABLE = "enquiries";
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/* ═══════════════════════════════════════════════════════════
-   LOADER
-   ═══════════════════════════════════════════════════════════ */
 window.addEventListener("load",()=>{
   setTimeout(()=>{ document.getElementById("loader").classList.add("done"); initReveal(); },1500);
 });
 
-/* ═══════════════════════════════════════════════════════════
-   CURSOR
-   ═══════════════════════════════════════════════════════════ */
 const dot=document.getElementById("cur-dot"), ring=document.getElementById("cur-ring");
 document.addEventListener("mousemove",e=>{
   dot.style.left=ring.style.left=e.clientX+"px";
@@ -851,16 +870,10 @@ document.querySelectorAll("a,button,.pf-item,.t-card,.srv-card").forEach(el=>{
   el.addEventListener("mouseleave",()=>document.body.classList.remove("cur-hover"));
 });
 
-/* ═══════════════════════════════════════════════════════════
-   NAV
-   ═══════════════════════════════════════════════════════════ */
 window.addEventListener("scroll",()=>document.getElementById("nav").classList.toggle("stuck",window.scrollY>60));
 function toggleMenu(){ document.getElementById("navLinks").classList.toggle("open"); }
 function closeMenu(){ document.getElementById("navLinks").classList.remove("open"); }
 
-/* ═══════════════════════════════════════════════════════════
-   SCROLL REVEAL
-   ═══════════════════════════════════════════════════════════ */
 function initReveal(){
   const io=new IntersectionObserver(entries=>{
     entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add("in"); });
@@ -868,9 +881,6 @@ function initReveal(){
   document.querySelectorAll(".rv").forEach(el=>io.observe(el));
 }
 
-/* ═══════════════════════════════════════════════════════════
-   COUNTER
-   ═══════════════════════════════════════════════════════════ */
 function countUp(el,target,sfx=""){
   let s=0; const dur=1800;
   const step=ts=>{ if(!s)s=ts; const p=Math.min((ts-s)/dur,1); el.textContent=Math.floor(p*target)+sfx; if(p<1)requestAnimationFrame(step); };
@@ -879,42 +889,51 @@ function countUp(el,target,sfx=""){
 const cntObs=new IntersectionObserver(e=>{ if(e[0].isIntersecting){ countUp(document.getElementById("cntProj"),50,"+"); cntObs.disconnect(); }},{threshold:.4});
 cntObs.observe(document.getElementById("hero"));
 
-/* ═══════════════════════════════════════════════════════════
-   PORTFOLIO — Supabase Database + Storage
-   ═══════════════════════════════════════════════════════════ */
-let projects=[], pfFilter_="all", lbIdx=0, lbFiltered=[];
+/* PORTFOLIO */
+let projects=[], pfFilter_="all", lbIdx=0, lbProject=null;
+
+function imgUrl(filename){
+  return sb.storage.from(STORAGE_BUCKET).getPublicUrl(filename).data.publicUrl;
+}
 
 async function loadProjects(){
   try {
-    let query = sb.from(DB_TABLE).select("*").order("created_at", {ascending:false});
+    let query = sb.from(DB_TABLE)
+      .select("*, project_images(id, filename, sort_order)")
+      .order("created_at", {ascending:false});
     if(pfFilter_ !== "all") query = query.eq("category", pfFilter_);
     const { data, error } = await query;
     if(error) throw error;
-    // Build full public image URL from Supabase Storage
     projects = (data||[]).map(p=>({
       ...p,
-      img: sb.storage.from(STORAGE_BUCKET).getPublicUrl(p.filename).data.publicUrl
+      images: (p.project_images||[]).sort((a,b)=>a.sort_order-b.sort_order),
+      coverImg: p.cover_filename ? imgUrl(p.cover_filename)
+        : (p.project_images?.length ? imgUrl(p.project_images.sort((a,b)=>a.sort_order-b.sort_order)[0].filename) : null)
     }));
     renderPF();
   } catch(err){
-    console.error("Failed to load projects:", err);
-    document.getElementById("pfGrid").innerHTML=`<div class="pf-empty"><div class="pf-empty-icon">⚠️</div><div class="pf-empty-text">Could not load portfolio.<br/>Check your Supabase config in index.html.</div></div>`;
+    console.error(err);
+    document.getElementById("pfGrid").innerHTML='<div class="pf-empty"><div class="pf-empty-icon">!</div><div class="pf-empty-text">Could not load portfolio.</div></div>';
   }
 }
 
 function renderPF(){
+  const filtered = pfFilter_==="all" ? projects : projects.filter(p=>p.category===pfFilter_);
   const g=document.getElementById("pfGrid");
-  lbFiltered = projects;
   g.innerHTML="";
-  if(!lbFiltered.length){
-    g.innerHTML=`<div class="pf-empty"><div class="pf-empty-icon">🏛️</div><div class="pf-empty-text">Portfolio projects will appear here.<br/>Check back soon or follow us on Instagram.</div></div>`;
+  if(!filtered.length){
+    g.innerHTML='<div class="pf-empty"><div class="pf-empty-icon">&#x1F3DB;</div><div class="pf-empty-text">Portfolio projects will appear here.<br/>Check back soon or follow us on Instagram.</div></div>';
     return;
   }
-  lbFiltered.forEach((p,i)=>{
+  filtered.forEach((p,i)=>{
     const d=document.createElement("div"); d.className="pf-item";
-    d.innerHTML=`<img src="${p.img}" alt="${p.name}" loading="lazy"/>
-      <div class="pf-over"><div class="pf-cat">${p.category}</div><div class="pf-name">${p.name}</div><div class="pf-yr">${p.year||""}</div></div>
-      <button class="pf-zoom" onclick="lbOpen(${i})">View ↗</button>`;
+    const count=p.images?.length||0;
+    const multiLabel = count>1 ? ' &nbsp;&middot;&middot;&middot; <span style="font-size:.55rem;color:var(--gold);letter-spacing:.15em">'+count+' PHOTOS</span>' : '';
+    d.innerHTML='<img src="'+(p.coverImg||'')+'" alt="'+p.name+'" loading="lazy"/>'
+      +'<div class="pf-over"><div class="pf-cat">'+p.category+'</div>'
+      +'<div class="pf-name">'+p.name+'</div>'
+      +'<div class="pf-yr">'+( p.year||"")+multiLabel+'</div></div>'
+      +'<button class="pf-zoom" onclick="lbOpen('+i+',event)">View &#x2197;</button>';
     g.appendChild(d);
   });
 }
@@ -927,29 +946,60 @@ function pfFilter(cat,btn){
   loadProjects();
 }
 
-/* ═══════════════════════════════════════════════════════════
-   LIGHTBOX
-   ═══════════════════════════════════════════════════════════ */
-function lbOpen(i){
-  lbIdx=i; const p=lbFiltered[i];
-  document.getElementById("lb-img").src=p.img;
-  document.getElementById("lb-title").textContent=p.name;
-  document.getElementById("lb-sub").textContent=`${p.category} · ${p.year||""}`;
+/* LIGHTBOX */
+function lbOpen(projectIdx,e){
+  if(e) e.stopPropagation();
+  const filtered = pfFilter_==="all" ? projects : projects.filter(p=>p.category===pfFilter_);
+  lbProject=filtered[projectIdx]; lbIdx=0;
+  lbShow();
+  lbBuildStrip();
   document.getElementById("lb").classList.add("open");
   document.body.style.overflow="hidden";
 }
+
+function lbShow(){
+  if(!lbProject) return;
+  const imgs=lbProject.images;
+  const src = (imgs&&imgs.length) ? imgUrl(imgs[lbIdx].filename) : (lbProject.coverImg||"");
+  document.getElementById("lb-img").src=src;
+  document.getElementById("lb-title").textContent=lbProject.name;
+  const total=imgs?.length||1;
+  document.getElementById("lb-sub").textContent=lbProject.category+" \u00b7 "+(lbProject.year||"")+" \u00b7 Photo "+(lbIdx+1)+" of "+total;
+  document.querySelectorAll(".lb-thumb").forEach((t,i)=>{
+    t.style.opacity=i===lbIdx?"1":"0.45";
+    t.style.borderColor=i===lbIdx?"var(--gold)":"transparent";
+  });
+}
+
+function lbBuildStrip(){
+  document.getElementById("lb-strip")?.remove();
+  const imgs=lbProject?.images;
+  if(!imgs||imgs.length<=1) return;
+  const strip=document.createElement("div");
+  strip.id="lb-strip";
+  strip.style.cssText="display:flex;gap:6px;overflow-x:auto;padding:8px 0;margin-top:8px;scrollbar-width:thin;scrollbar-color:var(--gold3) transparent";
+  imgs.forEach((img,i)=>{
+    const t=document.createElement("div");
+    t.className="lb-thumb";
+    t.style.cssText="flex-shrink:0;width:72px;height:54px;overflow:hidden;cursor:pointer;border:2px solid "+(i===0?"var(--gold)":"transparent")+";opacity:"+(i===0?"1":"0.45")+";transition:opacity .2s,border-color .2s";
+    t.innerHTML='<img src="'+imgUrl(img.filename)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"/>';
+    t.onclick=()=>{ lbIdx=i; lbShow(); };
+    strip.appendChild(t);
+  });
+  document.querySelector(".lb-meta").after(strip);
+}
+
 function lbClose(e){
   if(!e||e.target===document.getElementById("lb")||e.target.classList.contains("lb-x")){
     document.getElementById("lb").classList.remove("open");
     document.body.style.overflow="";
+    document.getElementById("lb-strip")?.remove();
   }
 }
 function lbNav(dir){
-  lbIdx=(lbIdx+dir+lbFiltered.length)%lbFiltered.length;
-  const p=lbFiltered[lbIdx];
-  document.getElementById("lb-img").src=p.img;
-  document.getElementById("lb-title").textContent=p.name;
-  document.getElementById("lb-sub").textContent=`${p.category} · ${p.year||""}`;
+  if(!lbProject?.images?.length) return;
+  lbIdx=(lbIdx+dir+lbProject.images.length)%lbProject.images.length;
+  lbShow();
 }
 document.addEventListener("keydown",e=>{
   if(document.getElementById("lb").classList.contains("open")){
@@ -959,95 +1009,65 @@ document.addEventListener("keydown",e=>{
   }
 });
 
-/* ═══════════════════════════════════════════════════════════
-   CONTACT FORM — saves to Supabase enquiries table
-   ═══════════════════════════════════════════════════════════ */
+/* CONTACT */
 async function sendForm(e){
   e.preventDefault();
-  const btn = e.target.querySelector(".f-submit");
-  btn.disabled = true;
-  const row = {
-    full_name:    e.target.querySelector("[placeholder='Your name']")?.value?.trim() || "",
-    phone:        e.target.querySelector("[type='tel']")?.value?.trim() || "",
-    email:        e.target.querySelector("[type='email']")?.value?.trim() || null,
-    project_type: e.target.querySelector("select")?.value || null,
-    message:      e.target.querySelector("textarea")?.value?.trim() || null,
+  const btn=e.target.querySelector(".f-submit"); btn.disabled=true;
+  const row={
+    full_name: e.target.querySelector("[placeholder='Your name']")?.value?.trim()||"",
+    phone: e.target.querySelector("[type='tel']")?.value?.trim()||"",
+    email: e.target.querySelector("[type='email']")?.value?.trim()||null,
+    project_type: e.target.querySelector("select")?.value||null,
+    message: e.target.querySelector("textarea")?.value?.trim()||null,
   };
-  if(!row.full_name || !row.phone){ toast("Please fill in name and phone.","err"); btn.disabled=false; return; }
+  if(!row.full_name||!row.phone){ toast("Please fill in name and phone.","err"); btn.disabled=false; return; }
   try {
-    const { error } = await sb.from(ENQUIRIES_TABLE).insert([row]);
+    const {error}=await sb.from(ENQUIRIES_TABLE).insert([row]);
     if(error) throw error;
-    toast("Enquiry sent! We'll contact you shortly.");
-    e.target.reset();
-  } catch(err) {
-    console.error(err);
-    toast("Could not send — please call us directly.","err");
-  }
-  btn.disabled = false;
+    toast("Enquiry sent! We'll contact you shortly."); e.target.reset();
+  } catch(err){ toast("Could not send. Please call us directly.","err"); }
+  btn.disabled=false;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   ADMIN — AUTH via Supabase Auth (email + password)
-   ═══════════════════════════════════════════════════════════
-   The admin user is created once in Supabase Dashboard →
-   Authentication → Users → Invite user (use ADMIN_EMAIL above).
-   ═══════════════════════════════════════════════════════════ */
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS   = 5 * 60 * 1000;
-const RATE_KEY     = "da_rate";
-
-document.addEventListener("keydown",e=>{
-  if(e.ctrlKey && e.shiftKey && e.key==="A"){ e.preventDefault(); revealAdmin(); }
-});
-
+/* ADMIN AUTH */
+const MAX_ATTEMPTS=5, LOCKOUT_MS=5*60*1000, RATE_KEY="da_rate";
+document.addEventListener("keydown",e=>{ if(e.ctrlKey&&e.shiftKey&&e.key==="A"){e.preventDefault();revealAdmin();} });
 async function revealAdmin(){
-  const sec=document.getElementById("admin");
-  sec.classList.add("vis");
-  const { data:{ session } } = await sb.auth.getSession();
+  const sec=document.getElementById("admin"); sec.classList.add("vis");
+  const {data:{session}}=await sb.auth.getSession();
   if(session) showDashboard();
   sec.scrollIntoView({behavior:"smooth"});
 }
-
-function getRateData(){ try{ return JSON.parse(localStorage.getItem(RATE_KEY)||"{}"); }catch(e){ return {}; } }
+function getRateData(){ try{return JSON.parse(localStorage.getItem(RATE_KEY)||"{}");}catch(e){return{};} }
 function setRateData(d){ localStorage.setItem(RATE_KEY,JSON.stringify(d)); }
-function checkLocked(){ const d=getRateData(); return (d.lockUntil && Date.now()<d.lockUntil) ? d.lockUntil : false; }
-function recordAttempt(){ const d=getRateData(); d.attempts=(d.attempts||0)+1; if(d.attempts>=MAX_ATTEMPTS){ d.lockUntil=Date.now()+LOCKOUT_MS; d.attempts=0; } setRateData(d); }
+function checkLocked(){ const d=getRateData(); return (d.lockUntil&&Date.now()<d.lockUntil)?d.lockUntil:false; }
+function recordAttempt(){ const d=getRateData(); d.attempts=(d.attempts||0)+1; if(d.attempts>=MAX_ATTEMPTS){d.lockUntil=Date.now()+LOCKOUT_MS;d.attempts=0;} setRateData(d); }
 function clearAttempts(){ setRateData({}); }
 
 async function doLogin(){
-  const btn=document.getElementById("ag-btn");
-  const errEl=document.getElementById("ag-err");
-  const lockEl=document.getElementById("ag-lock");
+  const btn=document.getElementById("ag-btn"),errEl=document.getElementById("ag-err"),lockEl=document.getElementById("ag-lock");
   errEl.textContent=""; lockEl.classList.remove("vis");
-
   const locked=checkLocked();
-  if(locked){ const mins=Math.ceil((locked-Date.now())/60000); lockEl.textContent=`Too many attempts. Try again in ${mins} minute${mins>1?"s":""}.`; lockEl.classList.add("vis"); return; }
-
+  if(locked){ const mins=Math.ceil((locked-Date.now())/60000); lockEl.textContent="Too many attempts. Try again in "+mins+" minute"+(mins>1?"s":"")+"."; lockEl.classList.add("vis"); return; }
   const email=document.getElementById("ag-user").value.trim();
   const pass=document.getElementById("ag-pass").value;
   if(!email||!pass){ errEl.textContent="Please enter email and password."; return; }
-
-  btn.disabled=true; btn.textContent="Verifying…";
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if(!error){
-    clearAttempts();
-    showDashboard();
-    toast("Welcome, Admin!");
-  } else {
+  btn.disabled=true; btn.textContent="Verifying...";
+  const {error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(!error){ clearAttempts(); showDashboard(); toast("Welcome, Admin!"); }
+  else {
     recordAttempt();
     const d=getRateData(); const left=MAX_ATTEMPTS-(d.attempts||0);
-    errEl.textContent=`Invalid credentials. ${left>0?left+" attempt"+(left>1?"s":"")+" remaining.":"Locked for 5 minutes."}`;
+    errEl.textContent="Invalid credentials. "+(left>0?left+" attempt"+(left>1?"s":"")+" remaining.":"Locked for 5 minutes.");
     document.getElementById("ag-pass").value="";
   }
   btn.disabled=false; btn.textContent="Login";
 }
-
 function showDashboard(){
   document.getElementById("ag").style.display="none";
   document.getElementById("ad").classList.add("vis");
   renderAdmGrid();
 }
-
 async function doLogout(){
   await sb.auth.signOut();
   document.getElementById("ad").classList.remove("vis");
@@ -1057,11 +1077,8 @@ async function doLogout(){
   toast("Logged out.");
 }
 
-/* ═══════════════════════════════════════════════════════════
-   ADMIN — UPLOAD to Supabase Storage + insert to DB
-   ═══════════════════════════════════════════════════════════ */
+/* ADMIN UPLOAD */
 let pendingFiles=[];
-
 const dz=document.getElementById("dz");
 dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
 dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
@@ -1070,11 +1087,13 @@ dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("over");dz
 function dzFiles(files){
   pendingFiles=Array.from(files);
   document.getElementById("pv-grid").innerHTML="";
-  pendingFiles.forEach(f=>{
+  pendingFiles.forEach((f,i)=>{
     const url=URL.createObjectURL(f);
     const pv=document.getElementById("pv-grid");
-    const t=document.createElement("div"); t.className="pv-thumb";
-    t.innerHTML=`<img src="${url}"/><button class="pv-del" onclick="this.parentElement.remove()">×</button>`;
+    const t=document.createElement("div"); t.className="pv-thumb"; t.style.position="relative";
+    t.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover"/>'
+      +(i===0?'<div style="position:absolute;bottom:0;left:0;right:0;background:var(--gold);color:var(--ink);font-size:.45rem;letter-spacing:.15em;text-align:center;padding:.2rem;font-weight:600">COVER</div>':"")
+      +'<button class="pv-del" onclick="this.parentElement.remove()">x</button>';
     pv.appendChild(t);
   });
 }
@@ -1084,88 +1103,153 @@ async function addProject(){
   const cat=document.getElementById("pj-cat").value;
   const year=parseInt(document.getElementById("pj-yr").value.trim())||new Date().getFullYear();
   const fileInput=document.getElementById("dz-in");
-  const files=[...pendingFiles, ...Array.from(fileInput.files)];
+  const files=[...pendingFiles,...Array.from(fileInput.files)];
   if(!files.length){ toast("Please select at least one image first.","err"); return; }
 
   const btn=document.querySelector(".add-form .f-submit");
-  btn.disabled=true; btn.querySelector("span").textContent="Uploading…";
+  const statusBox=document.getElementById("up-status");
+  const statusTitle=document.getElementById("up-status-title");
+  const statusDetail=document.getElementById("up-status-detail");
+  const bar=document.getElementById("up-bar");
+  function setStatus(t,d,p){ statusTitle.textContent=t; statusDetail.textContent=d; bar.style.width=p+"%"; }
+
+  btn.disabled=true; btn.querySelector("span").textContent="Uploading...";
+  statusBox.style.display="block";
+  setStatus("Creating project...","Getting ready...",0);
 
   try {
-    for(const file of files){
-      // Unique filename: timestamp + sanitised original name
-      const ext=file.name.split(".").pop().toLowerCase();
-      const safeName=`${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const ext0=files[0].name.split(".").pop().toLowerCase();
+    const coverFilename=Date.now()+"-"+Math.random().toString(36).slice(2)+"."+ext0;
 
-      // Upload to Supabase Storage
-      const { error: upErr } = await sb.storage
-        .from(STORAGE_BUCKET)
-        .upload(safeName, file, { cacheControl:"3600", upsert:false, contentType:file.type });
+    const {data:projData,error:projErr}=await sb.from(DB_TABLE).insert([{
+      name,category:cat,year,cover_filename:coverFilename
+    }]).select().single();
+    if(projErr) throw projErr;
+    const projectId=projData.id;
+
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      const pct=Math.round(((i+1)/files.length)*90);
+      setStatus("Uploading image "+(i+1)+" of "+files.length+"...",
+        file.name+" ("+( file.size/1024).toFixed(0)+" KB)",pct);
+      const safeName=i===0?coverFilename:Date.now()+"-"+Math.random().toString(36).slice(2)+"."+file.name.split(".").pop().toLowerCase();
+      const {error:upErr}=await sb.storage.from(STORAGE_BUCKET).upload(safeName,file,{cacheControl:"3600",upsert:false,contentType:file.type});
       if(upErr) throw upErr;
-
-      // Insert metadata row into projects table
-      const { error: dbErr } = await sb.from(DB_TABLE).insert([{
-        name, category:cat, year, filename:safeName,
-        original_name:file.name, file_size:file.size
-      }]);
-      if(dbErr) throw dbErr;
+      const {error:imgErr}=await sb.from(DB_IMAGES_TABLE).insert([{project_id:projectId,filename:safeName,sort_order:i}]);
+      if(imgErr) throw imgErr;
     }
-    toast(`${name} added to portfolio!`);
-    pendingFiles=[];
-    document.getElementById("pv-grid").innerHTML="";
-    fileInput.value="";
-    document.getElementById("pj-name").value="";
-    await loadProjects();
-    renderAdmGrid();
+
+    setStatus("All "+files.length+" image"+(files.length>1?"s":"")+" uploaded!","Refreshing...",100);
+    bar.style.background="#4ade80";
+    await loadProjects(); renderAdmGrid();
+    toast(name+" added!");
+    pendingFiles=[]; document.getElementById("pv-grid").innerHTML=""; fileInput.value=""; document.getElementById("pj-name").value="";
+    setTimeout(()=>{ statusBox.style.display="none"; bar.style.background="var(--gold)"; bar.style.width="0%"; },3000);
   } catch(err){
     console.error(err);
-    toast("Upload failed: "+err.message,"err");
+    setStatus("Upload failed",err.message||"Unknown error",0);
+    bar.style.background="#e05555";
+    toast("Upload failed: "+(err.message||"Unknown error"),"err");
   }
-  btn.disabled=false; btn.querySelector("span").textContent="Add ✓";
+  btn.disabled=false; btn.querySelector("span").textContent="Add";
 }
 
-async function delProject(id, filename){
-  if(!confirm("Remove this project from the portfolio?")) return;
+async function delProject(id){
+  if(!confirm("Remove this project and ALL its images?")) return;
   try {
-    // Delete from DB first
-    const { error:dbErr } = await sb.from(DB_TABLE).delete().eq("id",id);
-    if(dbErr) throw dbErr;
-    // Then delete from storage
-    await sb.storage.from(STORAGE_BUCKET).remove([filename]);
-    toast("Project removed.");
-    await loadProjects();
-    renderAdmGrid();
-  } catch(err){
-    toast("Delete failed: "+err.message,"err");
-  }
+    const {data:imgs}=await sb.from(DB_IMAGES_TABLE).select("filename").eq("project_id",id);
+    const {data:proj}=await sb.from(DB_TABLE).select("cover_filename").eq("id",id).single();
+    await sb.from(DB_IMAGES_TABLE).delete().eq("project_id",id);
+    await sb.from(DB_TABLE).delete().eq("id",id);
+    const filenames=(imgs||[]).map(i=>i.filename);
+    if(proj?.cover_filename&&!filenames.includes(proj.cover_filename)) filenames.push(proj.cover_filename);
+    if(filenames.length) await sb.storage.from(STORAGE_BUCKET).remove(filenames);
+    toast("Project removed."); await loadProjects(); renderAdmGrid();
+  } catch(err){ toast("Delete failed: "+err.message,"err"); }
 }
 
 async function renderAdmGrid(){
   const g=document.getElementById("adm-pf-grid");
-  g.innerHTML="<div style='grid-column:1/-1;text-align:center;padding:2rem;color:var(--fog);font-size:.8rem'>Loading…</div>";
-  const { data, error } = await sb.from(DB_TABLE).select("*").order("created_at",{ascending:false});
-  if(error){ g.innerHTML=`<div class="adm-empty" style="grid-column:1/-1">Could not load projects.</div>`; return; }
+  g.innerHTML="<div style='grid-column:1/-1;text-align:center;padding:2rem;color:var(--fog);font-size:.8rem'>Loading...</div>";
+  const {data,error}=await sb.from(DB_TABLE).select("*, project_images(id,filename,sort_order)").order("created_at",{ascending:false});
+  if(error){ g.innerHTML='<div class="adm-empty" style="grid-column:1/-1">Could not load.</div>'; return; }
   const all=(data||[]).map(p=>({
     ...p,
-    img: sb.storage.from(STORAGE_BUCKET).getPublicUrl(p.filename).data.publicUrl
+    images:(p.project_images||[]).sort((a,b)=>a.sort_order-b.sort_order),
+    coverImg:p.cover_filename?imgUrl(p.cover_filename):(p.project_images?.length?imgUrl(p.project_images[0].filename):null)
   }));
   g.innerHTML="";
-  if(!all.length){ g.innerHTML=`<div class="adm-empty" style="grid-column:1/-1">No projects yet. Upload your first design above.</div>`; return; }
+  if(!all.length){ g.innerHTML='<div class="adm-empty" style="grid-column:1/-1">No projects yet.</div>'; return; }
   all.forEach(p=>{
     const d=document.createElement("div"); d.className="pf-item";
-    d.innerHTML=`<img src="${p.img}" alt="${p.name}" loading="lazy"/>
-      <div class="pf-over"><div class="pf-cat">${p.category}</div><div class="pf-name">${p.name}</div></div>
-      <button class="pf-zoom" style="transform:translate(-50%,-50%) scale(1);opacity:1;background:rgba(224,85,85,.9);border-color:#e05555;color:white" onclick="delProject('${p.id}','${p.filename}')">Delete ✕</button>`;
+    const count=p.images?.length||0;
+    d.innerHTML=(p.coverImg?'<img src="'+p.coverImg+'" alt="'+p.name+'" loading="lazy"/>':"")
+      +'<div class="pf-over"><div class="pf-cat">'+p.category+'</div>'
+      +'<div class="pf-name">'+p.name+'</div>'
+      +'<div class="pf-yr">'+count+' photo'+(count!==1?"s":"")+'</div></div>'
+      +'<button class="pf-zoom" style="transform:translate(-50%,-50%) scale(1);opacity:1;background:rgba(224,85,85,.9);border-color:#e05555;color:white" onclick="delProject(\''+p.id+'\')">Delete X</button>';
     g.appendChild(d);
   });
 }
 
-// Update admin login label from "Username" to "Email"
 document.querySelector("#ag-user")?.setAttribute("placeholder","admin@yourdomain.com");
-document.querySelector(".ag-field label.fl")?.textContent && (document.querySelector(".ag-field label.fl").textContent="Email");
 
-/* ═══════════════════════════════════════════════════════════
-   TOAST
-   ═══════════════════════════════════════════════════════════ */
+/* FORGOT PASSWORD */
+function showForgot(){
+  document.getElementById("ag-login-view") && (document.getElementById("ag-login-view").style.display="none");
+  document.getElementById("ag-forgot-view").style.display="block";
+  document.getElementById("ag-forgot-err").textContent="";
+  document.getElementById("ag-forgot-ok").style.display="none";
+  document.getElementById("ag-reset-email").value="";
+  setTimeout(()=>document.getElementById("ag-reset-email").focus(),100);
+}
+
+function showLogin(){
+  document.getElementById("ag-login-view") && (document.getElementById("ag-login-view").style.display="block");
+  document.getElementById("ag-forgot-view").style.display="none";
+}
+
+async function doForgot(){
+  const btn=document.getElementById("ag-forgot-btn");
+  const errEl=document.getElementById("ag-forgot-err");
+  const okEl=document.getElementById("ag-forgot-ok");
+  errEl.textContent=""; okEl.style.display="none";
+
+  const email=document.getElementById("ag-reset-email").value.trim();
+  if(!email){ errEl.textContent="Please enter your email address."; return; }
+
+  btn.disabled=true; btn.textContent="Sending...";
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+
+  if(error){
+    errEl.textContent="Error: "+error.message;
+  } else {
+    okEl.innerHTML="Reset link sent to<br/><strong>"+email+"</strong><br/>Check your inbox (and spam folder).";
+    okEl.style.display="block";
+    document.getElementById("ag-reset-email").value="";
+  }
+
+  btn.disabled=false; btn.textContent="Send Reset Link";
+}
+
+// Handle password reset redirect (Supabase redirects back with token in URL hash)
+sb.auth.onAuthStateChange(async (event, session) => {
+  if(event === "PASSWORD_RECOVERY"){
+    const newPass = prompt("Enter your new password (min 6 characters):");
+    if(newPass && newPass.length >= 6){
+      const { error } = await sb.auth.updateUser({ password: newPass });
+      if(error){ toast("Could not update password: "+error.message, "err"); }
+      else {
+        toast("Password updated successfully! You are now logged in.");
+        showDashboard();
+      }
+    }
+  }
+});
+
 function toast(msg,type="ok"){
   const t=document.getElementById("toast");
   t.textContent=msg; t.className="on"+(type==="err"?" err":"");
